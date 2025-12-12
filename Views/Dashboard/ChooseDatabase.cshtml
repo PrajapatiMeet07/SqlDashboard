@@ -1,0 +1,17 @@
+@model SqlDashboard.Models.DatabaseSelectionModel
+
+<h2>Select Database</h2>
+
+<form asp-action="QueryEditor" method="post">
+    <input type="hidden" name="ConnectionString" value="@Model.ConnectionString" />
+
+    <label>Select a database:</label>
+    <select name="SelectedDatabase" style="padding:7px;width:100%;margin-top:5px;">
+        @foreach (var db in Model.Databases ?? new List<string>())
+        {
+            <option value="@db">@db</option>
+        }
+    </select>
+
+    <button type="submit" style="margin-top:15px;padding:8px 14px;background:#0b3d91;color:white;border:none;border-radius:6px;">Continue</button>
+</form>

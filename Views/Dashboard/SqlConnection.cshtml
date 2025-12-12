@@ -1,0 +1,47 @@
+
+@model SqlDashboard.Models.SqlConnectionModel
+@{
+    ViewData["Title"] = "SQL Connection";
+}
+
+<div style="max-width:640px;margin:0 auto;background:#fff;padding:20px;border-radius:8px;box-shadow:0 3px 10px rgba(0,0,0,0.05);">
+    <h2>SQL Connection Test</h2>
+
+    <form asp-action="TestConnection" method="post">
+        @Html.AntiForgeryToken()
+
+        <div style="margin-bottom:12px;">
+            <label>Server name</label><br />
+            <input asp-for="ServerName" class="input" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;" />
+        </div>
+
+        <div style="margin-bottom:12px;">
+            <label>Authentication</label><br />
+            <select asp-for="Authentication" class="input" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
+                <option value="Sql">SQL Server Authentication</option>
+                <option value="Windows">Windows Authentication</option>
+            </select>
+        </div>
+
+        <div style="margin-bottom:12px;">
+            <label>Login (for SQL Auth)</label><br />
+            <input asp-for="Login" class="input" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;" />
+        </div>
+
+        <div style="margin-bottom:12px;">
+            <label>Password (for SQL Auth)</label><br />
+            <input asp-for="Password" type="password" class="input" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;" />
+        </div>
+
+        <div style="margin-top:18px;">
+            <button type="submit" class="btn" style="padding:9px 14px;border:none;border-radius:6px;background:#0b3d91;color:white;">Test Connection</button>
+        </div>
+    </form>
+
+    @if(ViewBag.Message != null)
+    {
+        <div style="margin-top:18px;padding:10px;border-radius:6px;background:#f1f5f9;color:#0f172a;">
+            <strong>@ViewBag.Message</strong>
+        </div>
+    }
+</div>

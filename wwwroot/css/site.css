@@ -1,0 +1,14 @@
+body {
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    background: #f3f6fb;
+    color: #111827;
+    margin: 0;
+}
+.input:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(11,61,145,0.08);
+}
+.btn:hover {
+    opacity: 0.95;
+    cursor: pointer;
+}

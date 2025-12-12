@@ -1,0 +1,146 @@
+@model SqlDashboard.Models.QueryModel
+@using System.Data
+
+<!-- Bootstrap CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<<style>
+    .sidebar {
+        width: 260px;
+        background: #1e293b;
+        color: white;
+        height: 100vh;
+        position: fixed;
+        overflow-y: auto;
+        padding: 15px;
+    }
+
+    .sidebar h5 {
+        color: #93c5fd;
+        margin-top: 20px;
+        font-weight: 600;
+    }
+
+    .sidebar button,
+    .sidebar a {
+        width: 100%;
+        border: none;
+        background: none;
+        color: #e2e8f0;
+        text-align: left;
+        padding: 6px 5px;
+    }
+
+    .sidebar button:hover,
+    .sidebar a:hover {
+        background: #334155;
+        border-radius: 4px;
+    }
+
+    /* CONTENT AREA */
+    .content {
+        margin-left: 270px;
+        padding: 20px;
+    }
+
+</style>
+
+
+
+
+<!-- LEFT SIDEBAR -->
+<div class="sidebar">
+
+    <h5>📂 Dashboard</h5>
+    <a asp-action="QueryEditor">📝 Query Editor</a>
+
+    <h5>🗄 Databases</h5>
+
+    <form asp-action="ChangeDatabase" method="post">
+        <select name="databaseName" class="form-select bg-dark text-white" onchange="this.form.submit()">
+            @foreach (var db in Model.AvailableDatabases)
+            {
+                if (db == Model.SelectedDatabase)
+                {
+                    <option selected value="@db">@db</option>
+                }
+                else
+                {
+                    <option value="@db">@db</option>
+                }
+            }
+        </select>
+    </form>
+
+    <h5>📦 Tables</h5>
+
+    @foreach (var table in Model.Tables ?? new List<string>())
+    {
+        <form method="post" asp-action="RunQuery">
+            <input type="hidden" name="query" value="SELECT TOP 100 * FROM [@table]" />
+            <button type="submit">@table</button>
+        </form>
+    }
+
+    <hr style="border-color:#334155" />
+
+    <!-- <form method="post" asp-action="Disconnect">
+        <button class="btn btn-danger w-100 mt-2">🔌 Disconnect</button>
+    </form> -->
+<!-- 
+    <a class="btn btn-secondary w-100 mt-2" asp-action="SqlConnection">🔙 Back</a> -->
+</div>
+
+
+
+<!-- RIGHT CONTENT -->
+<div class="content">
+
+<div class="d-flex justify-content-end mb-3">
+    <form method="post" asp-action="Disconnect">
+        <button class="btn btn-danger">
+            🔌 Disconnect
+        </button>
+    </form>
+</div>
+    <h2>SQL Query Editor</h2>
+
+    <form asp-action="RunQuery" method="post">
+        <textarea name="query" rows="6" class="form-control">@Model.Query</textarea>
+        <button type="submit" class="btn btn-success mt-3">Run Query</button>
+    </form>
+
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger mt-3">@Model.ErrorMessage</div>
+    }
+
+    @if (Model.ResultTable != null)
+    {
+        <h4 class="mt-4">Results</h4>
+
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        @foreach (DataColumn col in Model.ResultTable.Columns)
+                        {
+                            <th>@col.ColumnName</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (DataRow row in Model.ResultTable.Rows)
+                    {
+                        <tr>
+                            @foreach (var item in row.ItemArray)
+                            {
+                                <td>@item</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
