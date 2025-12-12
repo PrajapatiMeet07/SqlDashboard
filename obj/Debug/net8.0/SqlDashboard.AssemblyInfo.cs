@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SqlDashboard")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4b042c1b33ea7cc9f26a66a5cfe13787433dabbd")]
 [assembly: System.Reflection.AssemblyProductAttribute("SqlDashboard")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SqlDashboard")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
