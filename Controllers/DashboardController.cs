@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using SqlDashboard.Models;
 using System.Data;
-using Microsoft.Data.SqlClient;
 
 namespace SqlDashboard.Controllers
 {
@@ -10,49 +10,41 @@ namespace SqlDashboard.Controllers
         private static string? serverConnection;
         private static string? activeConnection;
         private static string? lastUsedDatabase;
+        private static readonly string[] ImageRoots =
+{
+    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+    Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
+    Path.Combine(Directory.GetCurrentDirectory(), "AppImages")
+};
 
-        // ---------------------------------------
-        // SQL CONNECTION PAGE
-        // ---------------------------------------
+
+        // ================= LOGIN =================
+
         public IActionResult SqlConnection()
         {
             return View();
         }
 
         [HttpPost]
-        public IActionResult SqlConnection(SqlConnectionModel model)
+        public IActionResult SqlConnection(string server, string user, string password)
         {
             try
             {
-                string cs;
+                serverConnection =
+                    $"Server={server};User Id={user};Password={password};Encrypt=False;";
 
-                if (model.Authentication == "Windows")
-                {
-                    cs = $"Server={model.ServerName};Trusted_Connection=True;Encrypt=False;";
-                }
-                else
-                {
-                    cs = $"Server={model.ServerName};User Id={model.Login};Password={model.Password};Encrypt=False;";
-                }
-
-                using SqlConnection conn = new SqlConnection(cs);
+                using var conn = new SqlConnection(serverConnection);
                 conn.Open();
 
-                serverConnection = cs;
-
-                return RedirectToAction("TestConnection", model);
+                return RedirectToAction("QueryEditor");
             }
             catch (Exception ex)
             {
-                ModelState.AddModelError("", ex.Message);
-                return View(model);
+                ViewBag.Error = ex.Message;
+                return View();
             }
         }
-
-        // ---------------------------------------
-        // TEST CONNECTION → DIRECT TO QueryEditor
-        // ---------------------------------------
-        [HttpPost]
+[HttpPost]
         [ValidateAntiForgeryToken]
         public IActionResult TestConnection(SqlConnectionModel model)
         {
@@ -113,138 +105,141 @@ namespace SqlDashboard.Controllers
                 return View("SqlConnection", model);
             }
         }
+        // ================= QUERY EDITOR =================
 
-        // ---------------------------------------
-        // QUERY EDITOR
-        // ---------------------------------------
         public IActionResult QueryEditor()
         {
             if (string.IsNullOrEmpty(serverConnection))
                 return RedirectToAction("SqlConnection");
 
-            QueryModel model = new QueryModel();
+            QueryModel model = new();
             LoadDatabases(model);
+            LoadTables(model);
 
             return View(model);
         }
 
-        // ---------------------------------------
-        // CHANGE DATABASE
-        // ---------------------------------------
         [HttpPost]
         public IActionResult ChangeDatabase(string databaseName)
         {
-        if (string.IsNullOrEmpty(serverConnection))
-        return RedirectToAction("SqlConnection");
+            activeConnection = $"{serverConnection};Initial Catalog={databaseName};";
 
-        activeConnection = $"{serverConnection};Initial Catalog={databaseName};";
-        lastUsedDatabase = databaseName;
-
-        QueryModel model = new QueryModel();
-        LoadDatabases(model);
-
-        model.SelectedDatabase = databaseName;
-
-        return View("QueryEditor", model);
-        }
-
-
-        // ---------------------------------------
-        // RUN QUERY
-        // ---------------------------------------
-        [HttpPost]
-        public IActionResult RunQuery(string query)
-        {
-            if (string.IsNullOrEmpty(activeConnection))
-                return RedirectToAction("SqlConnection");
-
-            QueryModel model = new QueryModel();
+            QueryModel model = new();
             LoadDatabases(model);
-            model.Query = query;
-
-            try
-            {
-                using SqlConnection conn = new SqlConnection(activeConnection);
-                conn.Open();
-
-                using SqlCommand cmd = new SqlCommand(query, conn);
-                using SqlDataAdapter da = new SqlDataAdapter(cmd);
-
-                DataTable dt = new DataTable();
-                da.Fill(dt);
-
-                model.ResultTable = dt;
-            }
-            catch (Exception ex)
-            {
-                model.ErrorMessage = ex.Message;
-            }
+            model.SelectedDatabase = databaseName;
+            LoadTables(model);
 
             return View("QueryEditor", model);
         }
+[HttpPost]
+public IActionResult RunQuery(string query)
+{
+    QueryModel model = new();
+    LoadDatabases(model);
+    LoadTables(model);
+    model.Query = query;
 
-        // ---------------------------------------
-        // DISCONNECT
-        // ---------------------------------------
+    try
+    {
+        using var conn = new SqlConnection(activeConnection);
+        conn.Open();
+
+        using var da = new SqlDataAdapter(query, conn);
+        DataTable dt = new();
+        da.Fill(dt);
+
+        model.ResultTable = dt;
+    }
+    catch (Exception ex)
+    {
+        model.ErrorMessage = ex.Message;
+    }
+
+    return View("QueryEditor", model);
+}
         [HttpPost]
         public IActionResult Disconnect()
         {
             serverConnection = null;
             activeConnection = null;
-            lastUsedDatabase = null;
-
             return RedirectToAction("SqlConnection");
         }
 
-        // ---------------------------------------
-        // LOAD DATABASES & TABLES (LEFT PANEL)
-        // ---------------------------------------
+        // ================= IMAGE VIEWER (SECURE) =================
+
+[HttpGet]
+public IActionResult ViewTransactionImage(string path)
+{
+    if (string.IsNullOrWhiteSpace(path))
+        return BadRequest("Empty path");
+
+    // decode URL
+    path = Uri.UnescapeDataString(path).Trim();
+
+    // IMPORTANT: normalize slashes
+    path = path.Replace("/", "\\");
+
+    // DEBUG — TEMPORARY
+    System.Diagnostics.Debug.WriteLine("IMAGE PATH = " + path);
+
+    if (!System.IO.File.Exists(path))
+        return NotFound("File not found on disk: " + path);
+
+    return PhysicalFile(path, "image/jpeg");
+}
+
+
+private static string GetContentType(string path)
+{
+    string ext = Path.GetExtension(path).ToLowerInvariant();
+
+    return ext switch
+    {
+        ".png" => "image/png",
+        ".jpg" => "image/jpeg",
+        ".jpeg" => "image/jpeg",
+        ".gif" => "image/gif",
+        ".bmp" => "image/bmp",
+        _ => "application/octet-stream"
+    };
+}
+        // ================= HELPERS =================
+
         private void LoadDatabases(QueryModel model)
         {
-            if (string.IsNullOrEmpty(serverConnection))
-                return;
-
-            model.AvailableDatabases.Clear();
-
-            using SqlConnection conn = new SqlConnection(serverConnection);
+            using var conn = new SqlConnection(serverConnection);
             conn.Open();
 
             DataTable dt = conn.GetSchema("Databases");
 
             foreach (DataRow row in dt.Rows)
-            {
-                string? db = row["database_name"]?.ToString();
-                if (!string.IsNullOrEmpty(db))
-                    model.AvailableDatabases.Add(db);
-            }
+                model.AvailableDatabases.Add(row["database_name"].ToString()!);
 
-            // Maintain selected DB
-            if (string.IsNullOrEmpty(activeConnection))
+            if (activeConnection == null && model.AvailableDatabases.Any())
             {
-                string firstDb = model.AvailableDatabases.FirstOrDefault() ?? "master";
-                activeConnection = $"{serverConnection};Initial Catalog={firstDb};";
-                model.SelectedDatabase = firstDb;
+                model.SelectedDatabase = model.AvailableDatabases[0];
+                activeConnection = $"{serverConnection};Initial Catalog={model.SelectedDatabase};";
             }
             else
             {
                 model.SelectedDatabase =
-                    new SqlConnectionStringBuilder(activeConnection).InitialCatalog;
+                    new SqlConnectionStringBuilder(activeConnection!).InitialCatalog;
             }
+        }
 
-            // LOAD TABLES
-            model.Tables ??= new List<string>();
+        private void LoadTables(QueryModel model)
+        {
             model.Tables.Clear();
 
-            using SqlConnection tableConn = new SqlConnection(activeConnection);
-            tableConn.Open();
+            using var conn = new SqlConnection(activeConnection);
+            conn.Open();
 
-            DataTable tables = tableConn.GetSchema("Tables");
+            DataTable dt = conn.GetSchema("Tables");
 
-            foreach (DataRow row in tables.Rows)
+            foreach (DataRow row in dt.Rows)
             {
-                string? tableName = row["TABLE_NAME"]?.ToString();
-                if (!string.IsNullOrEmpty(tableName))
-                    model.Tables.Add(tableName);
+                if (row["TABLE_TYPE"].ToString() == "BASE TABLE")
+                    model.Tables.Add(row["TABLE_NAME"].ToString()!);
             }
         }
     }

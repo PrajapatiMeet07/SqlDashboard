@@ -74,3 +74,4 @@ D:\SqlDashboard\obj\Debug\net8.0\refint\SqlDashboard.dll
 D:\SqlDashboard\obj\Debug\net8.0\SqlDashboard.pdb
 D:\SqlDashboard\obj\Debug\net8.0\SqlDashboard.genruntimeconfig.cache
 D:\SqlDashboard\obj\Debug\net8.0\ref\SqlDashboard.dll
+D:\SqlDashboard\obj\Debug\net8.0\SqlDashboard.sourcelink.json
