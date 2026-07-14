@@ -1,22 +1,75 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
 <head>
     <meta charset="utf-8" />
     <title>@ViewData["Title"] - SqlDashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
     <link rel="stylesheet" href="~/css/site.css" />
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
-    <header style="background:#0b3d91;color:white;padding:10px 20px;">
-        <h1 style="margin:0;font-size:1.25rem;">SqlDashboard</h1>
-    </header>
+    <div class="app-container">
+        <!-- HEADER NAVBAR -->
+        <header class="app-navbar">
+            <div class="brand-section">
+                <i data-lucide="terminal" style="stroke-width: 2.5;"></i>
+                <span>SqlDashboard</span>
+                <span style="font-size: 0.75rem; font-weight: 500; padding: 0.15rem 0.4rem; background: rgba(37, 99, 235, 0.1); color: var(--primary); border-radius: 4px; margin-left: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">SSMS Web v2.0</span>
+            </div>
+            
+            <div class="nav-actions">
+                <button id="themeToggleBtn" class="btn-icon" title="Toggle Theme" aria-label="Toggle Theme">
+                    <i id="themeToggleIcon" data-lucide="moon"></i>
+                </button>
+            </div>
+        </header>
 
-    <main style="padding:20px;">
-        @RenderBody()
-    </main>
+        <!-- MAIN CONTENT AREA -->
+        <main style="flex: 1; overflow: hidden; position: relative;">
+            @RenderBody()
+        </main>
+    </div>
 
-    <footer style="padding:10px 20px;color:#666;">
-        <small>© SqlDashboard</small>
-    </footer>
+    <script>
+        // Theme switcher management
+        document.addEventListener("DOMContentLoaded", () => {
+            const themeToggleBtn = document.getElementById("themeToggleBtn");
+            const themeToggleIcon = document.getElementById("themeToggleIcon");
+            const htmlElement = document.documentElement;
+
+            // Load saved theme or default to light
+            const savedTheme = localStorage.getItem("sql-dashboard-theme") || "light";
+            htmlElement.setAttribute("data-theme", savedTheme);
+            updateThemeIcon(savedTheme);
+
+            themeToggleBtn.addEventListener("click", () => {
+                const currentTheme = htmlElement.getAttribute("data-theme");
+                const newTheme = currentTheme === "dark" ? "light" : "dark";
+                htmlElement.setAttribute("data-theme", newTheme);
+                localStorage.setItem("sql-dashboard-theme", newTheme);
+                updateThemeIcon(newTheme);
+                
+                // Dispatch event so other components (like Monaco Editor) can adapt
+                window.dispatchEvent(new CustomEvent('theme-changed', { detail: newTheme }));
+            });
+
+            function updateThemeIcon(theme) {
+                if (theme === "dark") {
+                    themeToggleIcon.setAttribute("data-lucide", "sun");
+                } else {
+                    themeToggleIcon.setAttribute("data-lucide", "moon");
+                }
+                if (window.lucide) {
+                    lucide.createIcons();
+                }
+            }
+
+            // Initialise Lucide icons
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        });
+    </script>
 </body>
 </html>

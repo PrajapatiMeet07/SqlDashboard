@@ -1,47 +1,116 @@
-
 @model SqlDashboard.Models.SqlConnectionModel
 @{
     ViewData["Title"] = "SQL Connection";
 }
 
-<div style="max-width:640px;margin:0 auto;background:#fff;padding:20px;border-radius:8px;box-shadow:0 3px 10px rgba(0,0,0,0.05);">
-    <h2>SQL Connection Test</h2>
-
-    <form asp-action="TestConnection" method="post">
-        @Html.AntiForgeryToken()
-
-        <div style="margin-bottom:12px;">
-            <label>Server name</label><br />
-            <input asp-for="ServerName" class="input" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;" />
+<div class="login-container">
+    <div class="panel login-card">
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+            <div style="display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 12px; background: rgba(37, 99, 235, 0.1); color: var(--primary); margin-bottom: 0.75rem;">
+                <i data-lucide="database" style="width: 24px; height: 24px;"></i>
+            </div>
+            <h2 style="font-weight: 700; font-size: 1.5rem; letter-spacing: -0.025em; color: var(--text-primary);">Connect to SQL Server</h2>
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">Enter your connection credentials to access the database dashboard</p>
         </div>
 
-        <div style="margin-bottom:12px;">
-            <label>Authentication</label><br />
-            <select asp-for="Authentication" class="input" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
-                <option value="Sql">SQL Server Authentication</option>
-                <option value="Windows">Windows Authentication</option>
-            </select>
-        </div>
+        <form asp-action="TestConnection" method="post" id="connectionForm">
+            @Html.AntiForgeryToken()
 
-        <div style="margin-bottom:12px;">
-            <label>Login (for SQL Auth)</label><br />
-            <input asp-for="Login" class="input" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;" />
-        </div>
+            <div class="form-group">
+                <label class="form-label">Server name</label>
+                <div style="position: relative;">
+                    <i data-lucide="server" style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-secondary);"></i>
+                    <input asp-for="ServerName" class="form-input" style="padding-left: 2.25rem;" placeholder="e.g. localhost, (localdb)\MSSQLLocalDB" required />
+                </div>
+            </div>
 
-        <div style="margin-bottom:12px;">
-            <label>Password (for SQL Auth)</label><br />
-            <input asp-for="Password" type="password" class="input" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;" />
-        </div>
+            <div class="form-group">
+                <label class="form-label">Authentication</label>
+                <div style="position: relative;">
+                    <i data-lucide="shield" style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-secondary);"></i>
+                    <select asp-for="Authentication" class="form-input" style="padding-left: 2.25rem; appearance: none; -webkit-appearance: none;" id="authSelect">
+                        <option value="Sql">SQL Server Authentication</option>
+                        <option value="Windows">Windows Authentication</option>
+                    </select>
+                    <i data-lucide="chevron-down" style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-secondary); pointer-events: none;"></i>
+                </div>
+            </div>
 
-        <div style="margin-top:18px;">
-            <button type="submit" class="btn" style="padding:9px 14px;border:none;border-radius:6px;background:#0b3d91;color:white;">Test Connection</button>
-        </div>
-    </form>
+            <div id="sqlAuthFields">
+                <div class="form-group">
+                    <label class="form-label">Login</label>
+                    <div style="position: relative;">
+                        <i data-lucide="user" style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-secondary);"></i>
+                        <input asp-for="Login" class="form-input" style="padding-left: 2.25rem;" placeholder="Username" id="loginInput" />
+                    </div>
+                </div>
 
-    @if(ViewBag.Message != null)
-    {
-        <div style="margin-top:18px;padding:10px;border-radius:6px;background:#f1f5f9;color:#0f172a;">
-            <strong>@ViewBag.Message</strong>
-        </div>
-    }
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <div style="position: relative;">
+                        <i data-lucide="key-round" style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-secondary);"></i>
+                        <input asp-for="Password" type="password" class="form-input" style="padding-left: 2.25rem;" placeholder="••••••••" id="passwordInput" />
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 1.75rem;">
+                <button type="submit" class="btn btn-primary" style="width: 100%; height: 42px;" id="connectBtn">
+                    <span id="btnText">Connect Server</span>
+                    <div id="btnSpinner" style="display: none; width: 18px; height: 18px; border: 2px solid rgba(255, 255, 255, 0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                </button>
+            </div>
+        </form>
+
+        @if (ViewBag.Message != null)
+        {
+            <div style="margin-top: 1.25rem; padding: 1rem; border-radius: 8px; background: rgba(239, 68, 68, 0.08); border-left: 4px solid var(--danger); display: flex; gap: 0.75rem; align-items: flex-start; animation: fadeIn 0.3s ease;">
+                <i data-lucide="alert-circle" style="width: 18px; height: 18px; color: var(--danger); flex-shrink: 0; margin-top: 2px;"></i>
+                <div style="font-size: 0.875rem; color: var(--danger); font-weight: 500;">
+                    @ViewBag.Message
+                </div>
+            </div>
+        }
+    </div>
 </div>
+
+<style>
+@@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const authSelect = document.getElementById("authSelect");
+        const sqlAuthFields = document.getElementById("sqlAuthFields");
+        const loginInput = document.getElementById("loginInput");
+        const passwordInput = document.getElementById("passwordInput");
+        const form = document.getElementById("connectionForm");
+        const connectBtn = document.getElementById("connectBtn");
+        const btnText = document.getElementById("btnText");
+        const btnSpinner = document.getElementById("btnSpinner");
+
+        function toggleFields() {
+            if (authSelect.value === "Windows") {
+                sqlAuthFields.style.display = "none";
+                loginInput.removeAttribute("required");
+                passwordInput.removeAttribute("required");
+            } else {
+                sqlAuthFields.style.display = "block";
+                loginInput.setAttribute("required", "");
+                passwordInput.setAttribute("required", "");
+            }
+        }
+
+        authSelect.addEventListener("change", toggleFields);
+        toggleFields(); // Init on load
+
+        // Loading state
+        form.addEventListener("submit", () => {
+            connectBtn.disabled = true;
+            btnText.style.display = "none";
+            btnSpinner.style.display = "block";
+        });
+    });
+</script>

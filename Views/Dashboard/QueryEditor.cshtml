@@ -1,370 +1,2148 @@
 @model SqlDashboard.Models.QueryModel
 @using System.Data
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+@{
+    ViewData["Title"] = "Query Editor";
+}
+
+<!-- Monaco Editor CSS & AMD Loader -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"></script>
 
 <style>
-:root {
-    --glass: rgba(255,255,255,.75);
-    --border: rgba(255,255,255,.4);
-    --shadow: 0 20px 45px rgba(0,0,0,.12);
+/* ===== WORKSPACE WORKBENCH LAYOUT ===== */
+.editor-workspace {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background-color: var(--bg-main);
 }
 
-body {
-    margin: 0;
-    font-family: 'Inter', sans-serif;
-    background:
-        radial-gradient(circle at 15% 15%, #c7d2fe, transparent 40%),
-        radial-gradient(circle at 85% 10%, #bae6fd, transparent 40%),
-        #f8fafc;
+/* --- SIDEBAR --- */
+.sidebar-panel {
+    width: 280px;
+    height: 100%;
+    border-radius: 0;
+    border-top: none;
+    border-bottom: none;
+    border-left: none;
+    background: var(--bg-panel);
+    flex-shrink: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
 }
 
-.app {
-    height: 100vh;
-    display: grid;
-    grid-template-columns: 260px 1fr 360px;
-    gap: 18px;
-    padding: 18px;
+.sidebar-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(156, 163, 175, 0.05);
 }
 
-/* ===== PANELS ===== */
-.panel {
-    background: var(--glass);
-    backdrop-filter: blur(16px);
-    border: 1px solid var(--border);
-    border-radius: 22px;
-    box-shadow: var(--shadow);
-    padding: 16px;
+.sidebar-tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 0.65rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.sidebar-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    background: var(--bg-panel);
+}
+
+.sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+.tab-pane {
+    display: none;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+/* --- MAIN PANEL --- */
+.main-panel {
+    flex: 1;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    height: 100%;
+    border-right: 1px solid var(--border-color);
 }
 
-/* ===== SIDEBAR ===== */
-.sidebar h6 {
-    font-weight: 600;
-    margin-bottom: 10px;
+/* --- PREVIEW PANEL --- */
+.preview-panel {
+    width: 320px;
+    height: 100%;
+    border-radius: 0;
+    border-top: none;
+    border-bottom: none;
+    border-right: none;
+    background: var(--bg-panel);
+    flex-shrink: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
 }
 
-.table-btn {
-    all: unset;
-    display: block;
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: 12px;
+.preview-panel.collapsed {
+    width: 0;
+    opacity: 0;
+    border: none;
+    pointer-events: none;
+}
+
+.preview-panel-content {
+    flex: 1;
+    overflow: auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- TABS SYSTEM --- */
+.tab-bar-container {
+    display: flex;
+    align-items: center;
+    background: rgba(156, 163, 175, 0.03);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0.35rem 0.75rem 0 0.75rem;
+    gap: 0.5rem;
+}
+
+.tab-list {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    flex: 1;
+}
+
+.tab-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.85rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    font-size: 0.775rem;
+    font-weight: 500;
+    color: var(--text-secondary);
     cursor: pointer;
-    color: #334155;
-    transition: background .15s, transform .15s;
+    white-space: nowrap;
+    position: relative;
+    top: 1px;
+    transition: all 0.15s ease;
 }
 
-.table-btn:hover {
-    background: rgba(99,102,241,.12);
-    transform: translateX(4px);
+.tab-item.active {
+    background: var(--bg-panel);
+    border-color: var(--border-color);
+    color: var(--primary);
+    font-weight: 600;
 }
 
-/* ===== CENTER ===== */
-.header {
+.tab-item:hover:not(.active) {
+    background: rgba(156, 163, 175, 0.08);
+}
+
+.tab-close {
+    border-radius: 50%;
+    width: 14px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    transition: background 0.15s, color 0.15s;
+}
+
+.tab-close:hover {
+    background: var(--danger);
+    color: white !important;
+}
+
+.btn-tab-add {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 0.35rem;
+    cursor: pointer;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-tab-add:hover {
+    background: rgba(156, 163, 175, 0.1);
+}
+
+/* --- TOOLBAR --- */
+.toolbar {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border-color);
+    gap: 0.75rem;
+}
+
+.active-connection-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--text-secondary);
+}
+.status-indicator.online {
+    background-color: var(--success);
+    box-shadow: 0 0 8px var(--success);
+}
+
+/* --- EDITOR & RESIZER --- */
+.editor-container-wrapper {
+    height: 320px;
+    min-height: 120px;
+    width: 100%;
+    position: relative;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--editor-placeholder-bg);
+}
+
+.resizer-handle {
+    height: 5px;
+    width: 100%;
+    cursor: ns-resize;
+    background: transparent;
+    transition: background-color 0.2s ease;
+    z-index: 5;
+    position: relative;
+}
+
+.resizer-handle:hover, .resizer-handle.dragging {
+    background-color: var(--primary);
+}
+
+/* --- RESULTS AREA --- */
+.results-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: var(--bg-panel);
+}
+
+.results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(156, 163, 175, 0.02);
+}
+
+.results-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.results-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.results-body {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    padding: 0;
+}
+
+.results-footer {
+    height: 26px;
+    padding: 0.25rem 1rem;
+    font-size: 0.75rem;
+    background: rgba(156, 163, 175, 0.05);
+    border-top: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+}
+
+.placeholder-msg {
+    color: var(--text-secondary);
+    text-align: center;
+    font-size: 0.875rem;
+    padding: 2.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.placeholder-msg i {
+    width: 32px;
+    height: 32px;
+    opacity: 0.5;
+}
+
+.query-error {
+    background: rgba(239, 68, 68, 0.06);
+    color: var(--danger);
+    border-left: 4px solid var(--danger);
+    padding: 1rem;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    line-height: 1.5;
+    animation: fadeIn 0.2s ease;
+}
+
+/* --- RESULTS DATA GRID --- */
+.results-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.825rem;
+}
+
+.results-table th {
+    background: var(--bg-main);
+    position: sticky;
+    top: 0;
+    font-weight: 600;
+    padding: 0.65rem 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+    white-space: nowrap;
+    z-index: 1;
+}
+
+.results-table td {
+    padding: 0.45rem 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.results-table tr {
+    transition: background-color 0.1s ease;
+    cursor: pointer;
+}
+
+.results-table tr:hover {
+    background-color: rgba(37, 99, 235, 0.05);
+}
+
+.results-table tr.selected {
+    background-color: rgba(37, 99, 235, 0.1) !important;
+}
+
+/* --- SCHEMA TREE VIEW --- */
+.tree-root {
+    user-select: none;
+    font-family: inherit;
+}
+
+.tree-node {
+    margin-top: 2px;
+}
+
+.tree-header {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.825rem;
+    color: var(--text-primary);
+    transition: background 0.15s;
+    position: relative;
+}
+
+.tree-header:hover {
+    background: rgba(156, 163, 175, 0.12);
+}
+
+.tree-toggle {
+    width: 14px;
+    height: 14px;
+    color: var(--text-secondary);
+    transition: transform 0.15s ease;
+}
+
+.tree-node.expanded > .tree-header > .tree-toggle {
+    transform: rotate(90deg);
+}
+
+.tree-children {
+    display: none;
+    border-left: 1px dashed var(--border-color);
+    margin-left: 11px;
+    padding-left: 0.5rem;
+}
+
+.tree-node.expanded > .tree-children {
+    display: block;
+}
+
+.node-icon {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+}
+.node-icon.db { color: #f59e0b; }
+.node-icon.folder { color: #3b82f6; }
+.node-icon.table { color: #10b981; }
+.node-icon.view { color: #818cf8; }
+.node-icon.proc { color: #ec4899; }
+
+.node-actions-trigger {
+    position: absolute;
+    right: 0.5rem;
+    opacity: 0;
+    padding: 2px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: opacity 0.15s, background 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tree-header:hover .node-actions-trigger {
+    opacity: 1;
+}
+
+.node-actions-trigger:hover {
+    background: rgba(156, 163, 175, 0.25);
+}
+
+/* --- CONTEXT MENU --- */
+.context-menu {
+    background: var(--bg-panel);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    padding: 0.35rem 0;
+    min-width: 180px;
+    animation: fadeIn 0.12s ease-out;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.context-menu-item:hover {
+    background: var(--primary);
+    color: white !important;
+}
+
+.context-menu-item i {
+    width: 14px;
+    height: 14px;
+}
+
+/* --- HISTORY --- */
+.history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.history-item {
+    padding: 0.65rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    background: rgba(156, 163, 175, 0.02);
+}
+
+.history-item:hover {
+    background: rgba(37, 99, 235, 0.05);
+    border-color: rgba(37, 99, 235, 0.3);
+}
+
+.history-sql {
+    font-family: monospace;
+    font-size: 0.775rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.4;
+    color: var(--text-primary);
+}
+
+.history-meta {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    margin-top: 0.35rem;
+    font-size: 0.65rem;
+    color: var(--text-secondary);
 }
 
-.query-box textarea {
-    border-radius: 14px;
-    resize: none;
-    border: 1px solid #e5e7eb;
-}
-
-.results {
-    margin-top: 14px;
-    overflow: auto;
-}
-
-.results table {
-    border-collapse: separate;
-    border-spacing: 0 10px;
-}
-
-.results tbody tr {
-    background: white;
-    border-radius: 16px;
-    cursor: pointer;
-    transition: transform .15s, box-shadow .15s;
-}
-
-.results tbody tr:hover {
-    transform: scale(1.01);
-    box-shadow: 0 14px 30px rgba(0,0,0,.15);
-}
-
-.results td, .results th {
-    border: none;
-    padding: 12px;
-}
-
-/* ===== IMAGE STAGE ===== */
-.preview-stage {
-    height: 100%;
+/* --- IMAGE PREVIEW PANNING --- */
+.image-stage-wrapper {
+    flex: 1;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    flex-direction: column;
-    }
-
-.panel-title {
-    font-weight: 600;
-    font-size: 14px;
-    color: #334155;
-    padding-bottom: 10px;
-    margin-bottom: 14px;
-    border-bottom: 1px solid rgba(0,0,0,.08);
-    text-align: left;
+    overflow: hidden;
+    position: relative;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: rgba(0,0,0,0.02);
+    min-height: 250px;
 }
-
-.preview-content {
-    flex: 1;
-    width: 100%;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 24px;
-    /* flex-direction: column; */
-}
-
 
 #imagePreview {
-    width: 100%;
-    height: auto;
-    max-height: 90vh;
+    max-width: 100%;
+    max-height: 70vh;
     object-fit: contain;
-    display: none;
-    border-radius: 16px;
-    box-shadow: 0 30px 60px rgba(0,0,0,.28);
-    transform: translateY(-10px);
-     cursor: zoom-in;
+    cursor: zoom-in;
+    transition: transform 0.1s ease-out;
 }
 
-
-@@keyframes fadeZoom {
-    from { opacity: 0; transform: scale(.96); }
-    to   { opacity: 1; transform: scale(1); }
-}
-
-.placeholder {
-    color: #64748b;
-    text-align: center;
-    font-size: 15px;
-}
-.query-error {
-    background: rgba(239,68,68,.08);
-    color: #991b1b;
-    border-left: 4px solid #ef4444;
-    padding: 10px 12px;
+/* Suggestions Box UI */
+.sugg-box {
+    position: absolute;
+    background: var(--bg-panel);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
-    font-size: 13px;
-    line-height: 1.4;
+    box-shadow: var(--panel-shadow);
+    padding: 0.5rem;
+    z-index: 100;
+    max-width: 300px;
 }
-
+.sugg-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    border-radius: 4px;
+    color: var(--text-primary);
+}
+.sugg-item:hover {
+    background: var(--primary);
+    color: white;
+}
 </style>
 
-<div class="app">
+<div class="editor-workspace">
+    <!-- LEFT SIDEBAR -->
+    <div class="sidebar-panel">
+        <div class="sidebar-tabs">
+            <button class="sidebar-tab active" id="btnExplorerTab">
+                <i data-lucide="folder-tree" style="width: 14px; height: 14px;"></i> Object Explorer
+            </button>
+            <button class="sidebar-tab" id="btnHistoryTab">
+                <i data-lucide="history" style="width: 14px; height: 14px;"></i> History
+            </button>
+        </div>
 
-    <!-- LEFT -->
-    <div class="panel sidebar">
-        <h6>Database</h6>
-        <form asp-action="ChangeDatabase" method="post">
-            <select name="databaseName"
-                    class="form-select mb-3"
-                    onchange="this.form.submit()">
-                @foreach (var db in Model.AvailableDatabases)
-                {
-                    <option selected="@(db == Model.SelectedDatabase)">@db</option>
-                }
-            </select>
-        </form>
+        <div class="sidebar-content">
+            <!-- Object Explorer Panel -->
+            <div id="explorerPanel" class="tab-pane active">
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                    <label class="form-label">Database Selection</label>
+                    <div style="position: relative;">
+                        <select id="dbSelect" class="form-input" style="padding-right: 2rem;">
+                            @foreach (var db in Model.AvailableDatabases)
+                            {
+                                <option selected="@(db == Model.SelectedDatabase)" value="@db">@db</option>
+                            }
+                        </select>
+                        <i data-lucide="chevron-down" style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-secondary); pointer-events: none;"></i>
+                    </div>
+                </div>
 
-        <h6>Tables</h6>
-        <div class="flex-grow-1 overflow-auto">
-            @foreach (var t in Model.Tables)
-            {
-                <form asp-action="RunQuery" method="post">
-                    <input type="hidden" name="query" value="SELECT TOP 100 * FROM [@t]" />
-                    <button class="table-btn">@t</button>
-                </form>
-            }
+                <div id="objectTree" class="tree-root">
+                    <div class="placeholder-msg" style="padding: 1.5rem 0;">
+                        <div id="treeLoadingSpinner" style="width: 24px; height: 24px; border: 2px solid rgba(37,99,235,0.2); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                        <span style="font-size: 0.75rem; margin-top: 0.5rem;">Loading schema metadata...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Query History Panel -->
+            <div id="historyPanel" class="tab-pane">
+                <div id="historyList" class="history-list">
+                    <div class="placeholder-msg">
+                        <i data-lucide="history"></i>
+                        <span>No queries run in this session yet.</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
+    <!-- CENTER AREA: EDITOR + RESULTS -->
+    <div class="main-panel">
+        <!-- Tabs Horizontal List -->
+        <div class="tab-bar-container">
+            <div class="tab-list" id="queryTabsList">
+                <!-- Dynamically filled -->
+            </div>
+            <button id="addTabBtn" class="btn-tab-add" title="New Query Tab">
+                <i data-lucide="plus" style="width: 16px; height: 16px;"></i>
+            </button>
+        </div>
 
-    <!-- CENTER -->
-    <div class="panel">
-        <div class="header mb-2">
-            <h6>Query Editor</h6>
-            <form asp-action="Disconnect" method="post">
-                <button class="btn btn-outline-danger btn-sm">Disconnect</button>
+        <!-- Toolbar controls -->
+        <div class="toolbar">
+            <button id="runBtn" class="btn btn-primary btn-sm" style="min-width: 75px;">
+                <i data-lucide="play" id="runIcon" style="width: 14px; height: 14px;"></i>
+                <span id="runBtnText">Run</span>
+                <div id="runSpinner" style="display: none; width: 14px; height: 14px; border: 2px solid rgba(255, 255, 255, 0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+            </button>
+
+            <button id="cancelBtn" class="btn btn-secondary btn-sm" style="display: none; color: var(--danger); border-color: rgba(239, 68, 68, 0.2);" title="Cancel running query execution">
+                <i data-lucide="square" style="width: 13px; height: 13px; fill: var(--danger);"></i>
+                <span>Cancel</span>
+            </button>
+
+            <button id="formatBtn" class="btn btn-secondary btn-sm" title="Format SQL Code (Shift+Alt+F)">
+                <i data-lucide="align-left" style="width: 14px; height: 14px;"></i>
+                <span>Format</span>
+            </button>
+
+            <div style="flex-grow: 1;"></div>
+
+            <div class="active-connection-status">
+                <span class="status-indicator online"></span>
+                <span id="connectionServer">Connected</span>
+            </div>
+
+            <form asp-action="Disconnect" method="post" style="margin: 0;">
+                <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.2);" title="Disconnect Server">
+                    <i data-lucide="log-out" style="width: 13px; height: 13px;"></i>
+                </button>
             </form>
         </div>
 
-        <form asp-action="RunQuery" method="post" class="query-box">
-    <textarea name="query"
-              rows="4"
-              class="form-control"
-              id="queryBox">@Model.Query</textarea>
-
-    <button class="btn btn-primary mt-2">Run</button>
-
-    @* ERROR SHOWN ONLY HERE *@
-    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
-    {
-        <div class="query-error mt-2">
-            @Model.ErrorMessage
+        <!-- Code Editor Wrapper -->
+        <div class="editor-container-wrapper">
+            <div id="monacoEditor" style="height: 100%; width: 100%;"></div>
         </div>
-    }
-</form>
 
-        @if (Model.ResultTable != null)
-        {
-            <div class="results">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            @foreach (DataColumn c in Model.ResultTable.Columns)
-                            {
-                                <th>@c.ColumnName</th>
-                            }
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (DataRow row in Model.ResultTable.Rows)
-                        {
-                            string? imageValue = null;
+        <!-- Resizing Handle -->
+        <div class="resizer-handle" id="workspaceResizer"></div>
 
-                            foreach (DataColumn col in Model.ResultTable.Columns)
-                            {
-                                var name = col.ColumnName.ToLower();
-                                if (name.Contains("image") || name.Contains("path"))
-                                {
-                                    if (row[col] != DBNull.Value)
-                                    {
-                                        imageValue = row[col].ToString();
-                                        break;
-                                    }
-                                }
-                            }
-
-                            <tr class="result-row" data-image="@imageValue">
-                                @foreach (DataColumn col in Model.ResultTable.Columns)
-                                {
-                                    <td>@row[col]</td>
-                                }
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+        <!-- Query Execution Results Grid -->
+        <div class="results-panel">
+            <div class="results-header">
+                <div class="results-title">
+                    <i data-lucide="terminal" style="width: 15px; height: 15px; color: var(--primary);"></i>
+                    <span>Messages / Grid</span>
+                </div>
+                <div class="results-actions" id="resultsActions" style="display: none;">
+                    <div style="position: relative;">
+                        <input type="text" id="gridFilter" class="form-input btn-sm" placeholder="Filter rows..." style="width: 160px; padding-left: 1.75rem;" />
+                        <i data-lucide="search" style="position: absolute; left: 0.5rem; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; color: var(--text-secondary);"></i>
+                    </div>
+                    <button id="exportCsvBtn" class="btn btn-secondary btn-sm" title="Export current grid to CSV file">
+                        <i data-lucide="file-spreadsheet" style="width: 13px; height: 13px;"></i>
+                        <span>CSV</span>
+                    </button>
+                    <button id="exportJsonBtn" class="btn btn-secondary btn-sm" title="Export current grid to JSON file">
+                        <i data-lucide="file-code" style="width: 13px; height: 13px;"></i>
+                        <span>JSON</span>
+                    </button>
+                    <button id="togglePreviewPanelBtn" class="btn btn-secondary btn-sm" title="Toggle Image Preview Panel">
+                        <i data-lucide="image" style="width: 13px; height: 13px;"></i>
+                    </button>
+                </div>
             </div>
-        }
-    </div>
-
-    <!-- RIGHT -->
-<div class="panel preview-stage">
-
-    <!-- PANEL TITLE -->
-    <div class="panel-title">
-        Image Preview
-    </div>
-
-    <!-- CONTENT -->
-    <div class="preview-content">
-        <img id="imagePreview" />
-
-        <div id="noImageText" class="placeholder">
-            Select a row to preview image
+            <div class="results-body" id="resultsBody">
+                <div class="placeholder-msg" id="resultsPlaceholder">
+                    <i data-lucide="play-circle"></i>
+                    <span>Write SQL query in editor and click Run (or press F5) to execute against database.</span>
+                </div>
+            </div>
+            <div class="results-footer" id="resultsFooter" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; width: 100%;">
+                <div id="resultsStatusText" style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Ready</div>
+                <div class="pagination-controls" id="paginationControls" style="display: none; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+                    <button class="btn btn-secondary btn-sm" id="btnPrevPage" style="padding: 2px 6px; font-weight: bold;" title="Previous Page">
+                        <i data-lucide="chevron-left" style="width: 12px; height: 12px;"></i>
+                    </button>
+                    <span id="pageIndicator" style="font-size: 0.725rem; font-weight: 500; min-width: 80px; text-align: center;">Page 1 of 1</span>
+                    <button class="btn btn-secondary btn-sm" id="btnNextPage" style="padding: 2px 6px; font-weight: bold;" title="Next Page">
+                        <i data-lucide="chevron-right" style="width: 12px; height: 12px;"></i>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
+    <!-- RIGHT PANEL: IMAGE PREVIEW -->
+    <div class="panel preview-panel collapsed" id="previewPanel">
+        <div class="panel-header" style="margin-bottom: 0.5rem; padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-color);">
+            <div class="panel-title" style="margin: 0; padding: 0; border: none; font-size: 0.8rem;">
+                <i data-lucide="image" style="color: var(--primary);"></i>
+                <span>Image Preview</span>
+            </div>
+            <button class="btn-icon btn-sm" style="width: 24px; height: 24px; border: none;" id="closePreviewBtn" title="Close Preview">
+                <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
+            </button>
+        </div>
+        <div class="preview-panel-content">
+            <div id="noImageText" class="placeholder-msg" style="padding-top: 3rem;">
+                <i data-lucide="image-off" style="opacity: 0.3;"></i>
+                <span>Select a data row containing a valid image path to display its preview.</span>
+            </div>
+            <div class="image-stage-wrapper" id="imageStageWrapper" style="display: none;">
+                <img id="imagePreview" alt="Database transaction preview" />
+                <div style="font-size: 0.7rem; color: var(--text-secondary); text-align: center; margin-top: 0.5rem; line-height: 1.3;">
+                    Scroll wheel: <strong>Zoom</strong><br>Click and drag: <strong>Pan</strong>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
+<!-- Dynamic autocomplete suggesting box if errors -->
+<div id="querySuggestionsBox" class="sugg-box" style="display: none;">
+    <div style="font-size: 0.7rem; font-weight: 600; padding: 2px 8px; color: var(--text-secondary); margin-bottom: 4px; border-bottom: 1px solid var(--border-color);">DID YOU MEAN?</div>
+    <div id="suggestionsList"></div>
 </div>
 
+<style>
+@@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+</style>
+
+<!-- CORE WORKSPACE IMPLEMENTATION LOGIC -->
 <script>
-document.addEventListener("click", e => {
-    const row = e.target.closest(".result-row");
-    if (!row) return;
+    // System parameters
+    const initialQueryText = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Query ?? "")) || "SELECT TOP 100 * FROM INFORMATION_SCHEMA.TABLES;";
+    const selectedDatabaseContext = "@Model.SelectedDatabase";
 
-    const path = row.dataset.image;
-    if (!path) return;
+    // Application state
+    let tabs = [];
+    let activeTabId = null;
+    let editor = null;
+    let queryHistory = [];
 
-    const img = document.getElementById("imagePreview");
-    const txt = document.getElementById("noImageText");
+    // Global variables for Monaco IntelliSense
+    let currentTables = [];
+    let currentColumns = [];
+    let currentViews = [];
+    let currentProcedures = [];
 
-    img.src = "/Dashboard/ViewTransactionImage?path=" + encodeURIComponent(path);
-    img.style.display = "block";
-    resetZoom();
-    txt.style.display = "none";
-});
-</script>
+    // Load static data from localStorage
+    try {
+        queryHistory = JSON.parse(localStorage.getItem("sql-history") || "[]");
+    } catch(e) {
+        queryHistory = [];
+    }
 
-<script>
-const errorText = `@Model.ErrorMessage`;
+    document.addEventListener("DOMContentLoaded", () => {
+        // Tab panel navigation (Object Explorer vs History)
+        const btnExplorerTab = document.getElementById("btnExplorerTab");
+        const btnHistoryTab = document.getElementById("btnHistoryTab");
+        const explorerPanel = document.getElementById("explorerPanel");
+        const historyPanel = document.getElementById("historyPanel");
 
-if (errorText.includes("Invalid object name")) {
-    fetch("/Dashboard/QuerySuggestions?term=")
-        .then(r => r.json())
-        .then(data => {
-            if (data.length) {
-                const sugg = document.getElementById("suggestions");
-                sugg.innerHTML = "";
-                data.forEach(s => {
-                    const item = document.createElement("button");
-                    item.className = "list-group-item list-group-item-action";
-                    item.textContent = "Did you mean: " + s;
-                    item.onclick = () => {
-                        queryBox.value += " " + s;
-                        sugg.style.display = "none";
-                        queryBox.focus();
-                    };
-                    sugg.appendChild(item);
-                });
-                sugg.style.display = "block";
+        btnExplorerTab.addEventListener("click", () => {
+            btnExplorerTab.classList.add("active");
+            btnHistoryTab.classList.remove("active");
+            explorerPanel.classList.add("active");
+            historyPanel.classList.remove("active");
+        });
+
+        btnHistoryTab.addEventListener("click", () => {
+            btnHistoryTab.classList.add("active");
+            btnExplorerTab.classList.remove("active");
+            historyPanel.classList.add("active");
+            explorerPanel.classList.remove("active");
+            renderHistoryList();
+        });
+
+        // Toggle Preview Panel via actions
+        const togglePreviewPanelBtn = document.getElementById("togglePreviewPanelBtn");
+        const closePreviewBtn = document.getElementById("closePreviewBtn");
+        const previewPanel = document.getElementById("previewPanel");
+
+        const togglePreview = () => {
+            previewPanel.classList.toggle("collapsed");
+        };
+
+        togglePreviewPanelBtn.addEventListener("click", togglePreview);
+        closePreviewBtn.addEventListener("click", () => previewPanel.classList.add("collapsed"));
+
+        // Init database selection change
+        const dbSelect = document.getElementById("dbSelect");
+        dbSelect.addEventListener("change", () => {
+            const db = dbSelect.value;
+            // Update active tab's database context
+            const activeTab = getActiveTab();
+            if (activeTab) {
+                activeTab.database = db;
+                saveTabsState();
+            }
+            loadSchemaTree(db);
+        });
+
+        // Vertical resizer
+        initVerticalResizer();
+
+        // Load Monaco Editor
+        initMonacoEditor();
+
+        // Setup Toolbar controls
+        document.getElementById("runBtn").addEventListener("click", executeActiveQuery);
+        document.getElementById("cancelBtn").addEventListener("click", () => {
+            const activeTab = getActiveTab();
+            if (activeTab && activeTab.isRunning && activeTab.abortController) {
+                activeTab.abortController.abort();
             }
         });
-}
-</script>
-<script>
-let zoomScale = 1;
-const MIN_ZOOM = 1;
-const MAX_ZOOM = 5;
-const ZOOM_STEP = 0.15;
+        document.getElementById("formatBtn").addEventListener("click", formatActiveQuery);
+        document.getElementById("addTabBtn").addEventListener("click", () => createNewTab());
 
-const img = document.getElementById("imagePreview");
+        // Setup Export buttons
+        document.getElementById("exportCsvBtn").addEventListener("click", exportActiveToCsv);
+        document.getElementById("exportJsonBtn").addEventListener("click", exportActiveToJson);
 
-function resetZoom() {
-    zoomScale = 1;
-    img.style.transform = "scale(1)";
-    img.style.transformOrigin = "center center";
-}
+        // Setup Pagination button controls
+        document.getElementById("btnPrevPage").addEventListener("click", () => {
+            const tab = getActiveTab();
+            if (tab && tab.currentPage > 0) {
+                tab.currentPage--;
+                renderActiveTabResults();
+            }
+        });
+        document.getElementById("btnNextPage").addEventListener("click", () => {
+            const tab = getActiveTab();
+            if (tab && tab.results) {
+                const totalRows = tab.results.rowCount;
+                const totalPages = Math.ceil(totalRows / 150);
+                if (tab.currentPage < totalPages - 1) {
+                    tab.currentPage = (tab.currentPage || 0) + 1;
+                    renderActiveTabResults();
+                }
+            }
+        });
 
-// Mouse-wheel zoom
-img.addEventListener("wheel", function (e) {
-    if (!img.src) return;
+        // Setup filter input keyup once
+        const gridFilter = document.getElementById("gridFilter");
+        gridFilter.addEventListener("input", () => {
+            const tab = getActiveTab();
+            if (tab) {
+                tab.currentPage = 0; // Reset page to 0 on new search
+                renderActiveTabResults();
+            }
+        });
 
-    e.preventDefault();
+        // Bind keyboard hooks
+        window.addEventListener("keydown", (e) => {
+            if (e.key === "F5") {
+                e.preventDefault();
+                executeActiveQuery();
+            }
+        });
 
-    const rect = img.getBoundingClientRect();
+        // Initialize Image Preview Zoom & Pan mechanics
+        initImagePreviewControls();
 
-    // Zoom towards cursor
-    const offsetX = ((e.clientX - rect.left) / rect.width) * 100;
-    const offsetY = ((e.clientY - rect.top) / rect.height) * 100;
+        // Listen for Theme Switcher event
+        window.addEventListener('theme-changed', (e) => {
+            if (window.monaco && editor) {
+                window.monaco.editor.setTheme(e.detail === 'dark' ? 'vs-dark' : 'vs');
+            }
+        });
+    });
 
-    img.style.transformOrigin = `${offsetX}% ${offsetY}%`;
+    // Monaco Editor configuration
+    function initMonacoEditor() {
+        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.48.0/min/vs' }});
+        require(['vs/editor/editor.main'], function() {
+            // Reg Autocomplete completions
+            registerCompletionsProvider();
 
-    if (e.deltaY < 0) {
-        zoomScale = Math.min(zoomScale + ZOOM_STEP, MAX_ZOOM);
-    } else {
-        zoomScale = Math.max(zoomScale - ZOOM_STEP, MIN_ZOOM);
+            // Set current editor theme
+            const currentTheme = document.documentElement.getAttribute("data-theme") || "light";
+            const editorTheme = currentTheme === "dark" ? "vs-dark" : "vs";
+
+            editor = monaco.editor.create(document.getElementById('monacoEditor'), {
+                value: '-- Write SQL Query here...\n' + initialQueryText,
+                language: 'sql',
+                theme: editorTheme,
+                automaticLayout: true,
+                minimap: { enabled: false },
+                fontSize: 13,
+                fontFamily: "'Courier New', Courier, monospace",
+                lineNumbers: 'on',
+                roundedSelection: true,
+                scrollBeyondLastLine: false,
+                cursorBlinking: 'smooth',
+                cursorSmoothCaretAnimation: 'on'
+            });
+
+            // Bind F5 run key inside editor
+            editor.addCommand(monaco.KeyCode.F5, executeActiveQuery);
+            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, executeActiveQuery);
+
+            // Synchronise editor modifications back to tab state
+            editor.onDidChangeModelContent(() => {
+                const activeTab = getActiveTab();
+                if (activeTab) {
+                    activeTab.sql = editor.getValue();
+                    saveTabsState();
+                }
+            });
+
+            // Load tabs state
+            initTabs();
+
+            // Load database schema
+            loadSchemaTree(dbSelect.value);
+        });
     }
 
-    img.style.transform = `scale(${zoomScale})`;
-});
+    // Custom Monaco Autocomplete Provider
+    function registerCompletionsProvider() {
+        monaco.languages.registerCompletionItemProvider('sql', {
+            provideCompletionItems: function(model, position) {
+                const word = model.getWordUntilPosition(position);
+                const range = {
+                    startLineNumber: position.lineNumber,
+                    endLineNumber: position.lineNumber,
+                    startColumn: word.startColumn,
+                    endColumn: word.endColumn
+                };
+
+                const suggestions = [];
+
+                // Standard T-SQL commands keywords
+                const sqlKeywords = [
+                    'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'JOIN', 'LEFT', 'RIGHT', 'INNER',
+                    'ON', 'GROUP BY', 'ORDER BY', 'INSERT', 'UPDATE', 'DELETE', 'INTO', 'VALUES',
+                    'CREATE', 'TABLE', 'DATABASE', 'DROP', 'ALTER', 'INDEX', 'VIEW', 'PROCEDURE',
+                    'TOP', 'AS', 'IN', 'LIKE', 'BETWEEN', 'NULL', 'IS', 'NOT', 'EXISTS', 'HAVING',
+                    'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'EXEC', 'EXECUTE', 'GO', 'UNION', 'ALL'
+                ];
+
+                sqlKeywords.forEach(kw => {
+                    suggestions.push({
+                        label: kw,
+                        kind: monaco.languages.CompletionItemKind.Keyword,
+                        insertText: kw,
+                        range: range
+                    });
+                });
+
+                // Add active schema tables
+                currentTables.forEach(t => {
+                    suggestions.push({
+                        label: t.name,
+                        kind: monaco.languages.CompletionItemKind.Class,
+                        insertText: `[${t.name}]`,
+                        detail: 'Table',
+                        range: range
+                    });
+                });
+
+                // Add active schema views
+                currentViews.forEach(v => {
+                    suggestions.push({
+                        label: v,
+                        kind: monaco.languages.CompletionItemKind.Interface,
+                        insertText: `[${v}]`,
+                        detail: 'View',
+                        range: range
+                    });
+                });
+
+                // Add active schema procedures
+                currentProcedures.forEach(p => {
+                    suggestions.push({
+                        label: p,
+                        kind: monaco.languages.CompletionItemKind.Method,
+                        insertText: `[${p}]`,
+                        detail: 'Stored Procedure',
+                        range: range
+                    });
+                });
+
+                // Add active schema columns
+                currentColumns.forEach(c => {
+                    suggestions.push({
+                        label: c.name,
+                        kind: monaco.languages.CompletionItemKind.Field,
+                        insertText: `[${c.name}]`,
+                        detail: `Column (${c.type}, ${c.tableName})`,
+                        range: range
+                    });
+                });
+
+                return { suggestions: suggestions };
+            }
+        });
+    }
+
+    // Load database schema trees via AJAX
+    function loadSchemaTree(dbName) {
+        const treeRoot = document.getElementById("objectTree");
+        
+        // Show loading spinner
+        treeRoot.innerHTML = `
+            <div class="placeholder-msg" style="padding: 1.5rem 0;">
+                <div style="width: 24px; height: 24px; border: 2px solid rgba(37,99,235,0.2); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                <span style="font-size: 0.75rem; margin-top: 0.5rem;">Loading schema metadata...</span>
+            </div>
+        `;
+
+        fetch(`/Dashboard/GetSchema?database=` + encodeURIComponent(dbName))
+            .then(res => res.json())
+            .then(res => {
+                if (!res.success) {
+                    treeRoot.innerHTML = `
+                        <div style="font-size: 0.8rem; color: var(--danger); padding: 1rem; border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; background: rgba(239, 68, 68, 0.05);">
+                            Error: ${res.errorMessage}
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Reset completions lists
+                currentTables = res.tables || [];
+                currentViews = res.views || [];
+                currentProcedures = res.procedures || [];
+                currentColumns = [];
+
+                // Flatten column suggestions list
+                currentTables.forEach(t => {
+                    if (t.columns) {
+                        t.columns.forEach(col => {
+                            currentColumns.push({
+                                name: col.name,
+                                type: col.type,
+                                tableName: t.name
+                            });
+                        });
+                    }
+                });
+
+                // Build explorer tree HTML
+                let treeHtml = `
+                    <div class="tree-node expanded">
+                        <div class="tree-header">
+                            <i data-lucide="chevron-right" class="tree-toggle"></i>
+                            <i data-lucide="database" class="node-icon db"></i>
+                            <span style="font-weight: 600;">${dbName}</span>
+                        </div>
+                        <div class="tree-children">
+                            <!-- Tables -->
+                            <div class="tree-node">
+                                <div class="tree-header">
+                                    <i data-lucide="chevron-right" class="tree-toggle"></i>
+                                    <i data-lucide="folder" class="node-icon folder"></i>
+                                    <span style="font-weight: 500;">Tables (${res.tables.length})</span>
+                                </div>
+                                <div class="tree-children" id="tablesTreeList">`;
+
+                if (res.tables.length === 0) {
+                    treeHtml += `<div class="tree-header" style="color: var(--text-secondary); opacity: 0.6;">No tables found</div>`;
+                } else {
+                    res.tables.forEach(t => {
+                        treeHtml += `
+                            <div class="tree-node" data-name="${t.name}">
+                                <div class="tree-header table-header-node" data-name="${t.name}">
+                                    <i data-lucide="chevron-right" class="tree-toggle"></i>
+                                    <i data-lucide="table" class="node-icon table"></i>
+                                    <span style="font-weight: 500;">${t.name}</span>
+                                    <div class="node-actions-trigger" data-type="table" data-name="${t.name}">
+                                        <i data-lucide="more-horizontal" style="width: 14px; height: 14px;"></i>
+                                    </div>
+                                </div>
+                                <div class="tree-children">
+                                    <div class="tree-node">
+                                        <div class="tree-header">
+                                            <i data-lucide="chevron-right" class="tree-toggle"></i>
+                                            <i data-lucide="folder" class="node-icon folder"></i>
+                                            <span>Columns</span>
+                                        </div>
+                                        <div class="tree-children">`;
+                        
+                        t.columns.forEach(col => {
+                            const pkMarkup = col.isPrimaryKey 
+                                ? `<i data-lucide="key" style="width:12px; height:12px; color: var(--warning); flex-shrink:0;"></i>` 
+                                : `<i data-lucide="columns" style="width:12px; height:12px; color: var(--text-secondary); flex-shrink:0;"></i>`;
+                            const nullableStr = col.nullable ? "null" : "not null";
+                            
+                            treeHtml += `
+                                <div class="tree-header" style="cursor: default;">
+                                    ${pkMarkup}
+                                    <span style="color: var(--tree-column); font-size: 0.775rem;">
+                                        <strong>${col.name}</strong> (${col.type}, ${nullableStr})
+                                    </span>
+                                </div>
+                            `;
+                        });
+
+                        treeHtml += `
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                treeHtml += `
+                                </div>
+                            </div>
+
+                            <!-- Views -->
+                            <div class="tree-node">
+                                <div class="tree-header">
+                                    <i data-lucide="chevron-right" class="tree-toggle"></i>
+                                    <i data-lucide="folder" class="node-icon folder"></i>
+                                    <span style="font-weight: 500;">Views (${res.views.length})</span>
+                                </div>
+                                <div class="tree-children">`;
+
+                if (res.views.length === 0) {
+                    treeHtml += `<div class="tree-header" style="color: var(--text-secondary); opacity: 0.6;">No views found</div>`;
+                } else {
+                    res.views.forEach(v => {
+                        treeHtml += `
+                            <div class="tree-header" style="cursor: default;">
+                                <i data-lucide="table-properties" class="node-icon view"></i>
+                                <span>${v}</span>
+                            </div>
+                        `;
+                    });
+                }
+
+                treeHtml += `
+                                </div>
+                            </div>
+
+                            <!-- Stored Procedures -->
+                            <div class="tree-node">
+                                <div class="tree-header">
+                                    <i data-lucide="chevron-right" class="tree-toggle"></i>
+                                    <i data-lucide="folder" class="node-icon folder"></i>
+                                    <span style="font-weight: 500;">Stored Procedures (${res.procedures.length})</span>
+                                </div>
+                                <div class="tree-children">`;
+
+                if (res.procedures.length === 0) {
+                    treeHtml += `<div class="tree-header" style="color: var(--text-secondary); opacity: 0.6;">No procedures found</div>`;
+                } else {
+                    res.procedures.forEach(p => {
+                        treeHtml += `
+                            <div class="tree-header" style="cursor: default;">
+                                <i data-lucide="cog" class="node-icon proc"></i>
+                                <span>${p}</span>
+                            </div>
+                        `;
+                    });
+                }
+
+                treeHtml += `
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                treeRoot.innerHTML = treeHtml;
+
+                // Initialize tree events (expand/collapse)
+                initTreeToggleEvents();
+
+                // Setup Context Menu triggers
+                initNodeContextMenuTriggers();
+
+                if (window.lucide) {
+                    lucide.createIcons();
+                }
+            })
+            .catch(err => {
+                treeRoot.innerHTML = `
+                    <div style="font-size: 0.8rem; color: var(--danger); padding: 1rem; border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; background: rgba(239, 68, 68, 0.05);">
+                        Request failed: ${err.message}
+                    </div>
+                `;
+            });
+    }
+
+    function initTreeToggleEvents() {
+        document.querySelectorAll(".tree-header").forEach(hdr => {
+            hdr.addEventListener("click", (e) => {
+                // Prevent toggle if clicking node action trigger
+                if (e.target.closest(".node-actions-trigger")) return;
+
+                const node = hdr.closest(".tree-node");
+                if (node) {
+                    node.classList.toggle("expanded");
+                }
+            });
+        });
+    }
+
+    function initNodeContextMenuTriggers() {
+        document.querySelectorAll(".node-actions-trigger").forEach(trigger => {
+            trigger.addEventListener("click", (e) => {
+                const nodeType = trigger.dataset.type;
+                const nodeName = trigger.dataset.name;
+                showNodeContextMenu(e, nodeType, nodeName);
+            });
+        });
+    }
+
+    function showNodeContextMenu(e, type, name) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Clear existing menus
+        const existing = document.getElementById("nodeContextMenu");
+        if (existing) existing.remove();
+
+        const menu = document.createElement("div");
+        menu.id = "nodeContextMenu";
+        menu.className = "context-menu";
+        menu.style.position = "fixed";
+        menu.style.top = e.clientY + "px";
+        menu.style.left = e.clientX + "px";
+        menu.style.zIndex = "1000";
+
+        if (type === "table") {
+            menu.innerHTML = `
+                <div class="context-menu-item" onclick="quickSelectTop100('${name}')">
+                    <i data-lucide="list-collapse"></i>
+                    <span>Select TOP 100 Rows</span>
+                </div>
+                <div class="context-menu-item" onclick="quickScriptTable('${name}')">
+                    <i data-lucide="file-code"></i>
+                    <span>Script CREATE Table</span>
+                </div>
+            `;
+        }
+
+        document.body.appendChild(menu);
+        if (window.lucide) lucide.createIcons();
+
+        // Close hook
+        const closeMenu = () => {
+            menu.remove();
+            document.removeEventListener("click", closeMenu);
+        };
+        setTimeout(() => document.addEventListener("click", closeMenu), 50);
+    }
+
+    // Context Quick actions
+    window.quickSelectTop100 = function(tableName) {
+        const sql = `SELECT TOP 100 * FROM [${tableName}];`;
+        const activeTab = getActiveTab();
+        if (activeTab) {
+            editor.setValue(sql);
+            executeActiveQuery();
+        }
+    };
+
+    window.quickScriptTable = function(tableName) {
+        const db = dbSelect.value;
+        fetch(`/Dashboard/GetTableScript?tableName=${encodeURIComponent(tableName)}&database=${encodeURIComponent(db)}`)
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    createNewTab(`Script: ${tableName}`, res.script);
+                } else {
+                    alert("Failed to script table: " + res.errorMessage);
+                }
+            })
+            .catch(err => alert("Script generation error: " + err.message));
+    };
+
+    // TABS SYSTEM MANAGEMENT
+    function initTabs() {
+        let savedTabs = [];
+        try {
+            savedTabs = JSON.parse(localStorage.getItem("sql-tabs") || "[]");
+        } catch(e) {
+            savedTabs = [];
+        }
+
+        if (savedTabs.length === 0) {
+            // Create default initial tab
+            createNewTab("Query 1.sql", '-- Write SQL Query here...\nSELECT TOP 100 * FROM INFORMATION_SCHEMA.TABLES;');
+        } else {
+            tabs = savedTabs;
+            // Restore active state
+            const activeId = localStorage.getItem("sql-active-tab-id");
+            const found = tabs.find(t => t.id === activeId);
+            if (found) {
+                activateTab(found.id);
+            } else {
+                activateTab(tabs[0].id);
+            }
+        }
+    }
+
+    function createNewTab(title = null, sql = "") {
+        const id = "tab_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+        const name = title || `Query ${tabs.length + 1}.sql`;
+        
+        const newTab = {
+            id: id,
+            name: name,
+            sql: sql || '-- Write SQL Query here...\n',
+            results: null,
+            errorMessage: null,
+            database: dbSelect.value,
+            statusText: "Ready",
+            isRunning: false,
+            abortController: null
+        };
+
+        tabs.push(newTab);
+        activateTab(id);
+        saveTabsState();
+    }
+
+    function activateTab(tabId) {
+        // Save current active editor state first
+        const currentActive = getActiveTab();
+        if (currentActive && editor) {
+            currentActive.sql = editor.getValue();
+        }
+
+        activeTabId = tabId;
+        
+        const tab = tabs.find(t => t.id === tabId);
+        if (!tab) return;
+
+        renderTabsList();
+
+        if (editor) {
+            editor.setValue(tab.sql);
+        }
+
+        if (tab.database && dbSelect.value !== tab.database) {
+            dbSelect.value = tab.database;
+            loadSchemaTree(tab.database);
+        }
+
+        // Render loader UI or result grid depending on running state of the tab
+        if (tab.isRunning) {
+            showLoadingStateUI();
+        } else {
+            renderActiveTabResults();
+            resetLoadingStateUI();
+        }
+
+        document.getElementById("connectionServer").textContent = `Server (Catalog: ${tab.database || 'master'})`;
+
+        localStorage.setItem("sql-active-tab-id", tabId);
+        saveTabsState();
+    }
+
+    function showLoadingStateUI() {
+        const runBtn = document.getElementById("runBtn");
+        const runIcon = document.getElementById("runIcon");
+        const runBtnText = document.getElementById("runBtnText");
+        const runSpinner = document.getElementById("runSpinner");
+        const cancelBtn = document.getElementById("cancelBtn");
+        const resultsBody = document.getElementById("resultsBody");
+        const statusText = document.getElementById("resultsStatusText");
+        const paginationControls = document.getElementById("paginationControls");
+
+        runBtn.disabled = true;
+        runIcon.style.display = "none";
+        runBtnText.style.display = "none";
+        runSpinner.style.display = "block";
+        cancelBtn.style.display = "inline-flex";
+
+        resultsBody.innerHTML = `
+            <div class="placeholder-msg" style="padding-top: 4rem;">
+                <div style="width: 32px; height: 32px; border: 3px solid rgba(37,99,235,0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                <span style="font-weight: 500; margin-top: 1rem; color: var(--text-primary);">Executing SQL Query statement...</span>
+            </div>
+        `;
+        paginationControls.style.display = "none";
+        statusText.textContent = "Executing query...";
+    }
+
+    function resetLoadingStateUI() {
+        const runBtn = document.getElementById("runBtn");
+        const runIcon = document.getElementById("runIcon");
+        const runBtnText = document.getElementById("runBtnText");
+        const runSpinner = document.getElementById("runSpinner");
+        const cancelBtn = document.getElementById("cancelBtn");
+
+        runBtn.disabled = false;
+        runIcon.style.display = "block";
+        runBtnText.style.display = "block";
+        runSpinner.style.display = "none";
+        cancelBtn.style.display = "none";
+    }
+
+    function closeTab(tabId, event) {
+        if (event) {
+            event.stopPropagation();
+        }
+
+        if (tabs.length <= 1) {
+            alert("At least one tab must remain open.");
+            return;
+        }
+
+        const tabIndex = tabs.findIndex(t => t.id === tabId);
+        if (tabIndex === -1) return;
+
+        const closedTab = tabs[tabIndex];
+        // Abort background executing query if closed
+        if (closedTab.isRunning && closedTab.abortController) {
+            closedTab.abortController.abort();
+        }
+
+        tabs.splice(tabIndex, 1);
+
+        // Adjust active tab pointer if closed active tab
+        if (activeTabId === tabId) {
+            const nextActiveIndex = tabIndex >= tabs.length ? tabs.length - 1 : tabIndex;
+            activateTab(tabs[nextActiveIndex].id);
+        } else {
+            renderTabsList();
+        }
+
+        saveTabsState();
+    }
+
+    function getActiveTab() {
+        return tabs.find(t => t.id === activeTabId);
+    }
+
+    function saveTabsState() {
+        // Exclude query results and errors to keep localStorage small and avoid QuotaExceededError
+        const serializedTabs = tabs.map(t => ({
+            id: t.id,
+            name: t.name,
+            sql: t.sql,
+            database: t.database,
+            statusText: t.statusText
+        }));
+        localStorage.setItem("sql-tabs", JSON.stringify(serializedTabs));
+    }
+
+    function renderTabsList() {
+        const listContainer = document.getElementById("queryTabsList");
+        listContainer.innerHTML = "";
+
+        tabs.forEach(tab => {
+            const isActive = tab.id === activeTabId;
+            const tabEl = document.createElement("div");
+            tabEl.className = `tab-item ${isActive ? 'active' : ''}`;
+            tabEl.onclick = () => activateTab(tab.id);
+            
+            // Double click to rename
+            tabEl.ondblclick = () => renameTab(tab.id);
+
+            let runningSpinnerMarkup = "";
+            if (tab.isRunning) {
+                runningSpinnerMarkup = `<div style="width: 12px; height: 12px; border: 1.5px solid rgba(37,99,235,0.2); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 4px; display: inline-block;"></div>`;
+            }
+
+            tabEl.innerHTML = `
+                ${runningSpinnerMarkup || '<i data-lucide="file-text" style="width: 13px; height: 13px;"></i>'}
+                <span>${tab.name}</span>
+                <span class="tab-close" onclick="closeTab('${tab.id}', event)">×</span>
+            `;
+
+            listContainer.appendChild(tabEl);
+        });
+
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    }
+
+    function renameTab(tabId) {
+        const tab = tabs.find(t => t.id === tabId);
+        if (!tab) return;
+
+        const newName = prompt("Rename Query Tab:", tab.name);
+        if (newName && newName.trim() !== "") {
+            tab.name = newName.trim();
+            renderTabsList();
+            saveTabsState();
+        }
+    }
+
+    // QUERY ASYNCHRONOUS EXECUTOR
+    function executeActiveQuery() {
+        const activeTab = getActiveTab();
+        if (!activeTab || !editor) return;
+
+        const query = editor.getValue();
+        if (!query.trim()) {
+            alert("Please type query in the editor first.");
+            return;
+        }
+
+        const db = dbSelect.value;
+        activeTab.sql = query;
+        activeTab.database = db;
+
+        // Abort previous execution if already running on this tab
+        if (activeTab.isRunning && activeTab.abortController) {
+            activeTab.abortController.abort();
+        }
+
+        // Setup tab-specific abort controller
+        activeTab.isRunning = true;
+        activeTab.abortController = new AbortController();
+        const signal = activeTab.abortController.signal;
+
+        // Render tab headers to show running spinner icon
+        renderTabsList();
+
+        // Update UI controls immediately if this is still the active tab
+        if (activeTab.id === activeTabId) {
+            showLoadingStateUI();
+        }
+
+        // Close suggestions box if open
+        document.getElementById("querySuggestionsBox").style.display = "none";
+
+        // Store reference to tab ID to handle background switching safely
+        const queryTabId = activeTab.id;
+
+        fetch("/Dashboard/ExecuteQuery", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                query: query,
+                database: db
+            }),
+            signal: signal
+        })
+        .then(r => r.json())
+        .then(res => {
+            const targetTab = tabs.find(t => t.id === queryTabId);
+            if (!targetTab) return;
+
+            targetTab.isRunning = false;
+            targetTab.abortController = null;
+
+            if (res.success) {
+                targetTab.results = {
+                    columns: res.columns,
+                    data: res.data,
+                    executionTimeMs: res.executionTimeMs,
+                    rowCount: res.rowCount
+                };
+                targetTab.errorMessage = null;
+                targetTab.statusText = `Query executed successfully - ${res.rowCount} rows in ${res.executionTimeMs}ms`;
+
+                // Log into query history
+                addQueryToHistory(query, db);
+            } else {
+                targetTab.results = null;
+                targetTab.errorMessage = res.errorMessage;
+                if (res.isCancelled) {
+                    targetTab.statusText = `Query execution cancelled.`;
+                } else {
+                    targetTab.statusText = `Query failed: check error details below.`;
+                    
+                    // Suggest if misspelt object table names and currently viewing this tab
+                    if (queryTabId === activeTabId) {
+                        handleInvalidObjectNameError(res.errorMessage);
+                    }
+                }
+            }
+
+            // Update UI ONLY if the user is still actively viewing the completed tab
+            if (queryTabId === activeTabId) {
+                resetLoadingStateUI();
+                renderActiveTabResults();
+            }
+
+            // Render tabs headers to remove spinner icon
+            renderTabsList();
+            saveTabsState();
+        })
+        .catch(err => {
+            const targetTab = tabs.find(t => t.id === queryTabId);
+            if (!targetTab) return;
+
+            targetTab.isRunning = false;
+            targetTab.abortController = null;
+
+            if (err.name === 'AbortError') {
+                targetTab.results = null;
+                targetTab.errorMessage = "Query execution was cancelled by the user.";
+                targetTab.statusText = "Query cancelled.";
+            } else {
+                targetTab.results = null;
+                targetTab.errorMessage = "Request connection failed: " + err.message;
+                targetTab.statusText = `Query failed.`;
+            }
+            
+            // Update UI ONLY if the user is still actively viewing the completed tab
+            if (queryTabId === activeTabId) {
+                resetLoadingStateUI();
+                renderActiveTabResults();
+            }
+
+            // Render tabs headers to remove spinner icon
+            renderTabsList();
+            saveTabsState();
+        });
+    }
+
+    // Suggestions trigger
+    function handleInvalidObjectNameError(errorMsg) {
+        if (errorMsg && errorMsg.toLowerCase().includes("invalid object name")) {
+            // Try to extract object name or ask suggestions endpoint
+            fetch("/Dashboard/QuerySuggestions?term=")
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.length) {
+                        const suggBox = document.getElementById("querySuggestionsBox");
+                        const list = document.getElementById("suggestionsList");
+                        list.innerHTML = "";
+                        
+                        data.forEach(s => {
+                            const btn = document.createElement("button");
+                            btn.className = "sugg-item";
+                            btn.textContent = `Did you mean: ${s}`;
+                            btn.onclick = () => {
+                                // Paste suggestion to end of editor text
+                                const val = editor.getValue();
+                                editor.setValue(val + "\nSELECT TOP 100 * FROM [" + s + "];");
+                                suggBox.style.display = "none";
+                                editor.focus();
+                            };
+                            list.appendChild(btn);
+                        });
+                        
+                        // Show next to editor toolbar
+                        suggBox.style.top = "190px";
+                        suggBox.style.left = "310px";
+                        suggBox.style.display = "block";
+                        
+                        setTimeout(() => {
+                            document.addEventListener("click", function hideSugg() {
+                                suggBox.style.display = "none";
+                                document.removeEventListener("click", hideSugg);
+                            });
+                        }, 50);
+                    }
+                });
+        }
+    }
+
+    function formatActiveQuery() {
+        if (editor) {
+            editor.getAction('editor.action.formatDocument').run();
+        }
+    }
+
+    // RENDER TABULAR RESULTS WITH PAGINATION & FILTERING
+    function renderActiveTabResults() {
+        const tab = getActiveTab();
+        const resultsBody = document.getElementById("resultsBody");
+        const actions = document.getElementById("resultsActions");
+        const statusText = document.getElementById("resultsStatusText");
+        const paginationControls = document.getElementById("paginationControls");
+        const pageIndicator = document.getElementById("pageIndicator");
+        const btnPrevPage = document.getElementById("btnPrevPage");
+        const btnNextPage = document.getElementById("btnNextPage");
+
+        if (!tab) return;
+
+        if (tab.errorMessage) {
+            actions.style.display = "none";
+            paginationControls.style.display = "none";
+            resultsBody.innerHTML = `
+                <div class="query-error">
+                    <strong>Error Message:</strong><br>${tab.errorMessage}
+                </div>
+            `;
+            statusText.textContent = tab.statusText;
+            return;
+        }
+
+        if (!tab.results) {
+            actions.style.display = "none";
+            paginationControls.style.display = "none";
+            resultsBody.innerHTML = `
+                <div class="placeholder-msg" id="resultsPlaceholder">
+                    <i data-lucide="play-circle"></i>
+                    <span>Write SQL query in editor and click Run (or press F5) to execute against database.</span>
+                </div>
+            `;
+            statusText.textContent = "Ready";
+            if (window.lucide) lucide.createIcons();
+            return;
+        }
+
+        const res = tab.results;
+        actions.style.display = "flex";
+
+        if (res.rowCount === 0) {
+            paginationControls.style.display = "none";
+            resultsBody.innerHTML = `
+                <div class="placeholder-msg">
+                    <i data-lucide="info"></i>
+                    <span>Query returned successfully, but no rows were returned.</span>
+                </div>
+            `;
+            statusText.textContent = tab.statusText;
+            if (window.lucide) lucide.createIcons();
+            return;
+        }
+
+        // Apply grid filter on FULL dataset first
+        const filterInput = document.getElementById("gridFilter");
+        const term = filterInput.value.toLowerCase().trim();
+        let filteredData = res.data;
+
+        if (term) {
+            filteredData = res.data.filter(row => {
+                return Object.values(row).some(val => 
+                    val !== null && val.toString().toLowerCase().includes(term)
+                );
+            });
+        }
+
+        // Setup pagination for filtered data
+        if (tab.currentPage === undefined) {
+            tab.currentPage = 0;
+        }
+
+        const PAGE_SIZE = 150; // Rendering 150 rows is fast (<1.5ms)
+        const totalRows = filteredData.length;
+        const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
+
+        // Adjust currentPage if out of bounds
+        if (tab.currentPage >= totalPages) {
+            tab.currentPage = totalPages - 1;
+        }
+        if (tab.currentPage < 0) {
+            tab.currentPage = 0;
+        }
+
+        // Slice data for active page
+        const startIndex = tab.currentPage * PAGE_SIZE;
+        const endIndex = Math.min(startIndex + PAGE_SIZE, totalRows);
+        const pagedData = filteredData.slice(startIndex, endIndex);
+
+        // Render pagination controls
+        if (totalPages > 1) {
+            paginationControls.style.display = "flex";
+            pageIndicator.textContent = `Page ${tab.currentPage + 1} of ${totalPages}`;
+            btnPrevPage.disabled = tab.currentPage === 0;
+            btnNextPage.disabled = tab.currentPage === totalPages - 1;
+        } else {
+            paginationControls.style.display = "none";
+        }
+
+        // Update status message
+        let statusMsg = tab.statusText;
+        if (term) {
+            statusMsg += ` | Filtered: ${totalRows} / ${res.rowCount} rows`;
+        }
+        statusText.textContent = statusMsg + ` (showing rows ${totalRows > 0 ? startIndex + 1 : 0}-${endIndex})`;
+
+        if (totalRows === 0) {
+            resultsBody.innerHTML = `
+                <div class="placeholder-msg">
+                    <i data-lucide="search-code"></i>
+                    <span>No matching rows found.</span>
+                </div>
+            `;
+            if (window.lucide) lucide.createIcons();
+            return;
+        }
+
+        // Render the paged table
+        let tableHtml = `
+            <table class="results-table" id="resultsDataTable">
+                <thead>
+                    <tr>
+                        <th style="width: 40px; text-align: center;">#</th>
+        `;
+
+        res.columns.forEach(col => {
+            tableHtml += `<th>${col.name}</th>`;
+        });
+
+        tableHtml += `
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        pagedData.forEach((row, index) => {
+            const rowIndex = startIndex + index;
+            // Check for image path
+            let imagePathVal = null;
+            Object.keys(row).forEach(key => {
+                const lowerKey = key.toLowerCase();
+                if (lowerKey.includes("image") || lowerKey.includes("path")) {
+                    if (row[key]) {
+                        imagePathVal = row[key];
+                    }
+                }
+            });
+
+            tableHtml += `
+                <tr onclick="selectGridRow(this, '${imagePathVal ? encodeURIComponent(imagePathVal) : ''}')">
+                    <td style="text-align: center; color: var(--text-secondary); background: rgba(156, 163, 175, 0.05); font-weight: 500;">${rowIndex + 1}</td>
+            `;
+
+            res.columns.forEach(col => {
+                const val = row[col.name];
+                tableHtml += `<td title="${val === null ? 'NULL' : val}">${val === null ? '<span style="color: var(--text-secondary); font-style: italic;">NULL</span>' : escapeHtml(val.toString())}</td>`;
+            });
+
+            tableHtml += `</tr>`;
+        });
+
+        tableHtml += `
+                </tbody>
+            </table>
+        `;
+
+        resultsBody.innerHTML = tableHtml;
+    }
+
+    function selectGridRow(tr, encodedPath) {
+        // Toggle selected styling
+        document.querySelectorAll("#resultsDataTable tbody tr").forEach(row => row.classList.remove("selected"));
+        tr.classList.add("selected");
+
+        const previewPanel = document.getElementById("previewPanel");
+        const noImageText = document.getElementById("noImageText");
+        const stageWrapper = document.getElementById("imageStageWrapper");
+        const img = document.getElementById("imagePreview");
+
+        if (!encodedPath) {
+            // Keep preview panel collapsed or show no image
+            noImageText.style.display = "flex";
+            stageWrapper.style.display = "none";
+            img.src = "";
+            return;
+        }
+
+        const path = decodeURIComponent(encodedPath);
+
+        // Open preview panel if collapsed
+        previewPanel.classList.remove("collapsed");
+
+        noImageText.style.display = "none";
+        stageWrapper.style.display = "flex";
+        
+        // Show loading status
+        img.src = "/Dashboard/ViewTransactionImage?path=" + encodeURIComponent(path);
+        
+        // Reset transform values
+        resetImageZoomPan();
+    }
+
+    // EXPORT FUNCTIONS
+    function exportActiveToCsv() {
+        const activeTab = getActiveTab();
+        if (!activeTab || !activeTab.results) return;
+
+        const res = activeTab.results;
+        let csvContent = "";
+
+        // Build columns header
+        const headers = res.columns.map(c => `"${c.name.replace(/"/g, '""')}"`);
+        csvContent += headers.join(",") + "\n";
+
+        // Build rows
+        res.data.forEach(row => {
+            const csvRow = res.columns.map(col => {
+                const val = row[col.name];
+                if (val === null) return '""';
+                return `"${val.toString().replace(/"/g, '""')}"`;
+            });
+            csvContent += csvRow.join(",") + "\n";
+        });
+
+        // Trigger file download
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", `${activeTab.name.replace('.sql', '')}_results.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function exportActiveToJson() {
+        const activeTab = getActiveTab();
+        if (!activeTab || !activeTab.results) return;
+
+        const res = activeTab.results;
+        const jsonStr = JSON.stringify(res.data, null, 2);
+
+        const blob = new Blob([jsonStr], { type: "application/json;charset=utf-8;" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", `${activeTab.name.replace('.sql', '')}_results.json`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // QUERY HISTORY LISTING
+    function addQueryToHistory(sql, db) {
+        // Exclude duplicate query entries from logging sequentially
+        if (queryHistory.length > 0 && queryHistory[0].sql === sql && queryHistory[0].database === db) {
+            return;
+        }
+
+        queryHistory.unshift({
+            sql: sql,
+            database: db,
+            timestamp: new Date().toLocaleTimeString()
+        });
+
+        // Keep maximum 40 items in history
+        if (queryHistory.length > 40) {
+            queryHistory.pop();
+        }
+
+        localStorage.setItem("sql-history", JSON.stringify(queryHistory));
+    }
+
+    function renderHistoryList() {
+        const list = document.getElementById("historyList");
+        if (queryHistory.length === 0) {
+            list.innerHTML = `
+                <div class="placeholder-msg">
+                    <i data-lucide="history"></i>
+                    <span>No queries run in this session yet.</span>
+                </div>
+            `;
+            if (window.lucide) lucide.createIcons();
+            return;
+        }
+
+        let html = "";
+        queryHistory.forEach((item, index) => {
+            html += `
+                <div class="history-item" onclick="loadHistoryItem(${index})">
+                    <div class="history-sql">${escapeHtml(item.sql)}</div>
+                    <div class="history-meta">
+                        <span>Database: <strong>${item.database}</strong></span>
+                        <span>${item.timestamp}</span>
+                    </div>
+                </div>
+            `;
+        });
+
+        list.innerHTML = html;
+    }
+
+    window.loadHistoryItem = function(index) {
+        const item = queryHistory[index];
+        if (!item || !editor) return;
+
+        const activeTab = getActiveTab();
+        if (activeTab) {
+            editor.setValue(item.sql);
+            if (item.database && dbSelect.value !== item.database) {
+                dbSelect.value = item.database;
+                activeTab.database = item.database;
+                loadSchemaTree(item.database);
+            }
+        }
+    };
+
+    // UI RESIZING SYSTEM HANDLER
+    function initVerticalResizer() {
+        const resizer = document.getElementById("workspaceResizer");
+        const editorWrapper = document.querySelector(".editor-container-wrapper");
+        
+        resizer.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            resizer.classList.add("dragging");
+            window.addEventListener("mousemove", resizeLayout);
+            window.addEventListener("mouseup", stopResizeLayout);
+        });
+
+        function resizeLayout(e) {
+            const containerRect = resizer.parentElement.getBoundingClientRect();
+            const newHeight = e.clientY - containerRect.top;
+            
+            // Boundary constraints: min 100px editor, min 150px results
+            if (newHeight >= 100 && newHeight <= containerRect.height - 150) {
+                editorWrapper.style.height = newHeight + "px";
+                if (editor) {
+                    editor.layout();
+                }
+            }
+        }
+
+        function stopResizeLayout() {
+            resizer.classList.remove("dragging");
+            window.removeEventListener("mousemove", resizeLayout);
+            window.removeEventListener("mouseup", stopResizeLayout);
+        }
+    }
+
+    // IMAGE PREVIEW PANNING & ZOOM IN/OUT CONTROLS
+    let zoomScale = 1;
+    const MIN_ZOOM = 1;
+    const MAX_ZOOM = 6;
+    const ZOOM_STEP = 0.2;
+
+    let isPanning = false;
+    let startX = 0, startY = 0;
+    let translateX = 0, translateY = 0;
+    
+    function initImagePreviewControls() {
+        const img = document.getElementById("imagePreview");
+        const wrapper = document.getElementById("imageStageWrapper");
+
+        // Scroll zoom hook
+        wrapper.addEventListener("wheel", (e) => {
+            if (!img.src || img.src === window.location.href) return;
+            e.preventDefault();
+
+            const rect = img.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // Zoom ratio calculations relative to cursor coords
+            const originX = (mouseX / rect.width) * 100;
+            const originY = (mouseY / rect.height) * 100;
+
+            img.style.transformOrigin = `${originX}% ${originY}%`;
+
+            if (e.deltaY < 0) {
+                zoomScale = Math.min(zoomScale + ZOOM_STEP, MAX_ZOOM);
+            } else {
+                zoomScale = Math.max(zoomScale - ZOOM_STEP, MIN_ZOOM);
+                if (zoomScale === 1) {
+                    translateX = 0;
+                    translateY = 0;
+                }
+            }
+
+            updateImageTransforms();
+        });
+
+        // Mouse click down drag pan hook
+        img.addEventListener("mousedown", (e) => {
+            if (zoomScale <= 1) return;
+            e.preventDefault();
+            isPanning = true;
+            startX = e.clientX - translateX;
+            startY = e.clientY - translateY;
+            img.style.cursor = "grabbing";
+        });
+
+        window.addEventListener("mousemove", (e) => {
+            if (!isPanning) return;
+            translateX = e.clientX - startX;
+            translateY = e.clientY - startY;
+            updateImageTransforms();
+        });
+
+        window.addEventListener("mouseup", () => {
+            if (isPanning) {
+                isPanning = false;
+                img.style.cursor = "zoom-in";
+            }
+        });
+    }
+
+    function resetImageZoomPan() {
+        zoomScale = 1;
+        translateX = 0;
+        translateY = 0;
+        const img = document.getElementById("imagePreview");
+        img.style.transform = "scale(1) translate(0px, 0px)";
+        img.style.transformOrigin = "center center";
+        img.style.cursor = "zoom-in";
+    }
+
+    function updateImageTransforms() {
+        const img = document.getElementById("imagePreview");
+        // Translate coordinates scale adjusted with zoom level
+        img.style.transform = `scale(${zoomScale}) translate(${translateX / zoomScale}px, ${translateY / zoomScale}px)`;
+    }
+
+    // UTILS HELPERS
+    function escapeHtml(string) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return string.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
 </script>
